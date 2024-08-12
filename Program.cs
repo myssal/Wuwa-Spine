@@ -3,6 +3,8 @@ using System.Buffers.Binary;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Collections;
+using System.Diagnostics.Tracing;
 
 namespace Spine
 {
@@ -10,14 +12,13 @@ namespace Spine
     {
         static void Main(string[] args)
         {
-            /*
+            
             if (args.Length < 1 || args[0] == "--help" || args[0] == "-h")
             {
                 Console.WriteLine("Wuwa_Spine.exe {spine folder} or directly drag folder into .exe");
                 return;
             }
-            string root = args[0];*/
-            string root = "F:\\FullSetC\\Tool\\Datamine\\UnrealEngine\\Fmodel\\Output\\Exports\\Client\\Content\\Aki\\UI\\UIResources\\Common\\Spine\\Anke";
+            string root = args[0];
             ParseData(root);
             Console.ReadLine();
 
@@ -34,7 +35,7 @@ namespace Spine
                 using (StreamReader sr = new StreamReader(file))
                 {
                     //pass empty file
-                    if (new FileInfo(file).Length > 0 && !file.Contains("Textures"))
+                    if (new FileInfo(file).Length > 0 && !file.Contains("Textures") &&file.Contains("json"))
                     {
                         try
                         {
@@ -42,7 +43,9 @@ namespace Spine
                             string jsonData = sr.ReadToEnd();
                             List<Root> spineData = JsonSerializer.Deserialize<List<Root>>(jsonData);
                             WriteAtlasToFile(spineData.ElementAt(0).Properties.rawData.ToString(), file.Replace("json", "atlas"));
+                            Console.WriteLine($"Created {Path.GetFileName(file).Replace("json", "atlas")}.atlas");
                             DecodeBytes(getSkelIntValue(spineData), file.Replace("json", "skel"));
+                            Console.WriteLine($"Created {Path.GetFileName(file).Replace("json", "skel")}.skel");
                         }
                         catch (Exception ex)
                         {
@@ -69,9 +72,12 @@ namespace Spine
         public static int[] getSkelIntValue(List<Root> spineData)
         {
             string skelData = spineData.ElementAt(1).Properties.rawData.ToString();
-            skelData.Replace("[", string.Empty);
-            skelData.Replace("]", string.Empty);
-            return skelData.Split(';').Select(int.Parse).ToArray();
+            string[] charToRemove = new string[] { "[", "]" };
+            foreach (string s in charToRemove)
+            {
+                skelData = skelData.Replace(s, string.Empty);
+            }
+            return skelData.Split(',').Select(int.Parse).ToArray();
         }
     }
 }
