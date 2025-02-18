@@ -6,10 +6,8 @@ namespace Spine
     {
         static void Main(string[] args)
         {
-            string location = @"F:\FullSetC\Temp\Spine - Copy";
-            Format fm = new Format(location);
-            //fm.DumpSpine();
-            fm.PostCleanJson();
+            Format fm = new Format(args[0]);
+            fm.SpineDump();
             
         }
     }

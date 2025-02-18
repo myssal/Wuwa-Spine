@@ -11,23 +11,15 @@ public partial class Format
             this.location = location;
             dumpCount = 0;
     }
-    
-    public void WriteAtlasToFile(string fileName, string content) => File.WriteAllText(fileName, content);
-    
-    // remove texture json
-    public void InitialCleanJson()
-    {
-        foreach (var jsonTexture in Directory.GetFiles(location, "*.json", SearchOption.AllDirectories).Where(f => f
-                .Contains("Textures")))
-            File.Delete(jsonTexture);
-    }
 
-    public void PostCleanJson()
+    public void SpineDump()
     {
-        foreach (var json in Directory.GetFiles(location, "*.json", SearchOption.AllDirectories))
-            File.Delete(json);
+        InitialCleanJson();
+        BulkDumping();
+        PostClean();
     }
-    public void DumpSpine()
+    
+    public void BulkDumping()
     {
         InitialCleanJson();
         foreach (var json in Directory.GetFiles(location, "*.json", SearchOption.AllDirectories))
@@ -77,24 +69,44 @@ public partial class Format
             throw;
         }
     }
-
-    public int[] RemoveBrackets(string rawSkelContent)
-    {
-        string[] charToRemove = new string[] { "[", "]" };
-        foreach (string s in charToRemove)
-        {
-            rawSkelContent = rawSkelContent.Replace(s, string.Empty);
-        }
-        return rawSkelContent.Split(',').Select(int.Parse).ToArray();
-    }
+    
     public byte[] DecodeSkel(int[] values) => values.Select(v => (byte)v).ToArray();
-    public void WriteAtlasFile(string path, string atlasName, string content) => File.WriteAllText(Path.Combine(path, atlasName), content);
+    
 
-    public void WriteSkelFile(string path, string skelName, byte[] content) => File.WriteAllBytes(Path.Combine(path, skelName), content);
+    #region CleanUpSection
     
-    public string FileNameOnly(string path) => Path.GetFileName(path);
+    public void InitialCleanJson()
+    {
+        foreach (var jsonTexture in Directory.GetFiles(location, "*.json", SearchOption.AllDirectories).Where(f => f
+                     .Contains("Textures")))
+            File.Delete(jsonTexture);
+    }
     
-    public string PathOnly(string path) => Path.GetDirectoryName(path);
+    public void PostClean()
+    {
+        PostCleanJson();
+        MoveTexture();
+        PostCleanTextureFolder();
+    }
+
+    public void PostCleanTextureFolder()
+    {
+        foreach (var folder in Directory.GetDirectories(location, "*Textures*", SearchOption.AllDirectories))
+            Directory.Delete(folder, true);
+    }
+    public void PostCleanJson()
+    {
+        foreach (var json in Directory.GetFiles(location, "*.json", SearchOption.AllDirectories))
+            File.Delete(json);
+    }
     
-    
+    public void MoveTexture()
+    {
+        foreach (var texture in Directory.GetFiles(location, "*.png", SearchOption.AllDirectories).Where(x => x.Contains("Textures")))
+        {
+            File.Move(texture, texture.Replace(@"Textures\", String.Empty), true);
+        }
+    }
+
+    #endregion
 }
