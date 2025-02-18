@@ -1,10 +1,4 @@
-﻿using System;
-using System.Buffers.Binary;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
-using System.Collections;
-using System.Diagnostics.Tracing;
+﻿using System.Text.Json;
 
 namespace Spine
 {
@@ -12,44 +6,37 @@ namespace Spine
     {
         static void Main(string[] args)
         {
+            string location = @"F:\FullSetC\Temp\Spine - Copy";
+            Format fm = new Format(location);
+            //fm.DumpSpine();
+            fm.PostCleanJson();
             
-            if (args.Length < 1 || args[0] == "--help" || args[0] == "-h")
-            {
-                Console.WriteLine("Wuwa_Spine.exe {spine folder} or directly drag folder into .exe");
-                return;
-            }
-            string root = args[0];
-            ParseData(root);
-            Console.ReadLine();
-
         }
 
 
         public static void ParseData(string root)
         {
-
-            List<string> filePath = Directory.GetFiles(root, "*.*", SearchOption.AllDirectories).ToList();
-            foreach (var file in filePath)
+            foreach (var file in Directory.GetFiles(root, "*.json*", SearchOption.AllDirectories).ToList())
             {
                 //parse data from json file                
                 using (StreamReader sr = new StreamReader(file))
                 {
                     //pass empty file
-                    if (new FileInfo(file).Length > 0 && !file.Contains("Textures") &&file.Contains("json"))
+                    if (new FileInfo(file).Length > 0 && !file.Contains("Textures"))
                     {
                         try
                         {
-                            Console.WriteLine($"Parse {file}");
+                            Console.WriteLine($"Parsing {file}...");
                             string jsonData = sr.ReadToEnd();
                             List<Root> spineData = JsonSerializer.Deserialize<List<Root>>(jsonData);
                             WriteAtlasToFile(spineData.ElementAt(0).Properties.rawData.ToString(), file.Replace("json", "atlas"));
-                            Console.WriteLine($"Created {Path.GetFileName(file).Replace("json", "atlas")}.atlas");
+                            Console.WriteLine($"Create {Path.GetFileName(file).Replace("json", "atlas")}.atlas");
                             DecodeBytes(getSkelIntValue(spineData), file.Replace("json", "skel"));
-                            Console.WriteLine($"Created {Path.GetFileName(file).Replace("json", "skel")}.skel");
+                            Console.WriteLine($"Create {Path.GetFileName(file).Replace("json", "skel")}.skel");
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine(ex.ToString());
+                            Console.WriteLine($"{ex.Message}: {ex.StackTrace}");
                         }
                     }
                 }
@@ -78,6 +65,13 @@ namespace Spine
                 skelData = skelData.Replace(s, string.Empty);
             }
             return skelData.Split(',').Select(int.Parse).ToArray();
+        }
+
+        public static void CleanUpJson(string root)
+        {
+            Console.WriteLine($"Cleaning up {root}...");
+            foreach (var jsonFile in Directory.GetFiles(root, "*.json", SearchOption.AllDirectories).ToList())
+                File.Delete(jsonFile);
         }
     }
 }
