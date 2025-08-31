@@ -7,12 +7,12 @@ namespace Spine;
 public class Format
 {
     private readonly string _location;
-    private int _dumpCount;
+    private int _successCount;
 
     public Format(string location)
     {
         _location = location;
-        _dumpCount = 0;
+        _successCount = 0;
     }
 
     public async Task SpineDumpAsync()
@@ -24,10 +24,15 @@ public class Format
 
     private async Task BulkDumpingAsync()
     {
-        foreach (var jsonFile in Directory.GetFiles(_location, "*.json", SearchOption.AllDirectories))
+        var jsonFiles = Directory.GetFiles(_location, "*.json", SearchOption.AllDirectories);
+        var totalFiles = jsonFiles.Length;
+
+        foreach (var jsonFile in jsonFiles)
         {
             await ParseContentAsync(jsonFile);
         }
+
+        Console.WriteLine($"Successfully dumped {_successCount}/{totalFiles} files.");
     }
 
     private async Task ParseContentAsync(string jsonFilePath)
@@ -59,7 +64,6 @@ public class Format
                     var atlasPath = Path.Combine(Path.GetDirectoryName(jsonFilePath), Path.GetFileName(atlasFileName));
                     Console.WriteLine($"Writing atlas file {atlasPath}");
                     await WriteAtlasFileAsync(atlasPath, rawData);
-                    _dumpCount++;
                 }
 
                 if (!string.IsNullOrEmpty(skelFileName))
@@ -68,9 +72,10 @@ public class Format
                     Console.WriteLine($"Writing skeleton file {skelPath}");
                     var skelBytes = DecodeSkel(RemoveBrackets(rawData));
                     await WriteSkelFileAsync(skelPath, skelBytes);
-                    _dumpCount++;
                 }
             }
+            
+            _successCount++;
         }
         catch (JsonException ex)
         {
