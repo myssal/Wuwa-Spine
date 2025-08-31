@@ -1,21 +1,17 @@
-﻿using System.Text.Json;
+namespace Spine;
 
-namespace Spine
+internal static class Program
 {
-    internal class Program
+    static async Task Main(string[] args)
     {
-        static void Main(string[] args)
+        if (args.Length == 1)
         {
-            if (args.Length == 1)
-            {
-                Format fm = new Format(args[0]);
-                fm.SpineDump();
-            }
-            else
-            {
-                Console.WriteLine("Usage: WuwaSpine.exe <path/to/spine/folder>");
-            }
-            
+            var format = new Format(args[0]);
+            await format.SpineDumpAsync();
+        }
+        else
+        {
+            Console.WriteLine("Usage: WuwaSpine.exe <path/to/spine/folder>");
         }
     }
 }

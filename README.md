@@ -1,5 +1,5 @@
 # Wuwa Spine
-Script to convert spine assets for [Wuthering Waves](https://wutheringwaves.kurogames.com).
+Script to convert l2d (spine) for [Wuthering Waves](https://wutheringwaves.kurogames.com).
 
 # How to use:
 - Command: `WuwaSpine.exe <path/to/spine/folder>`.

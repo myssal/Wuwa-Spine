@@ -1,110 +1,133 @@
-using Newtonsoft.Json.Linq;
+
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Spine;
 
-public partial class Format
+public class Format
 {
-    string location { get; set; }
-    private int dumpCount { get; set; }
+    private readonly string _location;
+    private int _dumpCount;
+
     public Format(string location)
     {
-            this.location = location;
-            dumpCount = 0;
+        _location = location;
+        _dumpCount = 0;
     }
 
-    public void SpineDump()
+    public async Task SpineDumpAsync()
     {
-        InitialCleanJson();
-        BulkDumping();
+        InitialClean();
+        await BulkDumpingAsync();
         PostClean();
     }
-    
-    public void BulkDumping()
+
+    private async Task BulkDumpingAsync()
     {
-        InitialCleanJson();
-        foreach (var json in Directory.GetFiles(location, "*.json", SearchOption.AllDirectories))
-                 ParseContent(json);
+        foreach (var jsonFile in Directory.GetFiles(_location, "*.json", SearchOption.AllDirectories))
+        {
+            await ParseContentAsync(jsonFile);
+        }
     }
 
-    public void ParseContent(string path)
+    private async Task ParseContentAsync(string jsonFilePath)
     {
         try
         {
-            Console.WriteLine($"Parsing {path}...");
-            var content = File.ReadAllText(path);
-            JArray parsed = JArray.Parse(content);
-            int count = 1;
-            foreach (JObject item in parsed)
+            Console.WriteLine($"Parsing {jsonFilePath}...");
+            var content = await File.ReadAllTextAsync(jsonFilePath);
+            var parsed = JsonNode.Parse(content);
+
+            if (parsed is not JsonArray jsonArray) return;
+
+            foreach (var item in jsonArray)
             {
-                JObject properties = (JObject)item["Properties"];
-                string rawData = properties["rawData"]?.ToString();
-                string expectedAtlasName = properties["atlasFileName"]?.ToString();
-                string expectedSkelName = properties["skeletonDataFileName"]?.ToString();
-                if (rawData == null)
-                    Console.WriteLine($"Cannot find content for spine file, skipping index {count}...");
-                else
+                if (item?["Properties"] is not JsonObject properties) continue;
+
+                var rawData = properties["rawData"]?.ToString();
+                var atlasFileName = properties["atlasFileName"]?.ToString();
+                var skelFileName = properties["skeletonDataFileName"]?.ToString();
+
+                if (string.IsNullOrEmpty(rawData))
                 {
-                    if (expectedAtlasName != null) 
-                    {
-                        // parse atlas
-                        Console.WriteLine($"Writing atlas file {Path.Combine(PathOnly(path), FileNameOnly(expectedAtlasName))}");
-                        WriteAtlasFile(PathOnly(path), FileNameOnly(expectedAtlasName), rawData);
-                        dumpCount++;
-                    }
-                    
-                    if (expectedSkelName != null)
-                    {
-                        // parse skel 
-                        Console.WriteLine($"Writing skeleton file {Path.Combine(PathOnly(path), FileNameOnly(expectedSkelName))}");
-                        WriteSkelFile(PathOnly(path), FileNameOnly(expectedSkelName), DecodeSkel(RemoveBrackets(rawData)));
-                        dumpCount++;
-                    }
+                    Console.WriteLine($"Cannot find content for spine file, skipping...");
+                    continue;
                 }
-                count++;
+
+                if (!string.IsNullOrEmpty(atlasFileName))
+                {
+                    var atlasPath = Path.Combine(Path.GetDirectoryName(jsonFilePath), Path.GetFileName(atlasFileName));
+                    Console.WriteLine($"Writing atlas file {atlasPath}");
+                    await WriteAtlasFileAsync(atlasPath, rawData);
+                    _dumpCount++;
+                }
+
+                if (!string.IsNullOrEmpty(skelFileName))
+                {
+                    var skelPath = Path.Combine(Path.GetDirectoryName(jsonFilePath), Path.GetFileName(skelFileName));
+                    Console.WriteLine($"Writing skeleton file {skelPath}");
+                    var skelBytes = DecodeSkel(RemoveBrackets(rawData));
+                    await WriteSkelFileAsync(skelPath, skelBytes);
+                    _dumpCount++;
+                }
             }
         }
-        catch (Exception e)
+        catch (JsonException ex)
         {
-            Console.WriteLine(e.StackTrace);
+            Console.WriteLine($"Error parsing JSON file: {jsonFilePath}. Error: {ex.Message}");
+        }
+        catch (IOException ex)
+        {
+            Console.WriteLine($"Error reading file: {jsonFilePath}. Error: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An unexpected error occurred while parsing {jsonFilePath}. Error: {ex.StackTrace}");
             throw;
         }
     }
-    
-    public byte[] DecodeSkel(int[] values) => values.Select(v => (byte)v).ToArray();
-    
 
-    #region CleanUpSection
-    
-    public void InitialCleanJson()
+    private static byte[] DecodeSkel(IEnumerable<int> values) => values.Select(v => (byte)v).ToArray();
+
+    private static int[] RemoveBrackets(string rawSkelContent)
     {
-        foreach (var jsonTexture in Directory.GetFiles(location, "*.json", SearchOption.AllDirectories).Where(f => f
-                     .Contains("Textures")))
-            File.Delete(jsonTexture);
-    }
-    
-    public void PostClean()
-    {
-        PostCleanJson();
-        MoveTexture();
-        PostCleanTextureFolder();
+        return rawSkelContent.Trim('[', ']').Split(',').Select(int.Parse).ToArray();
     }
 
-    public void PostCleanTextureFolder()
+    private static async Task WriteAtlasFileAsync(string path, string content) => await File.WriteAllTextAsync(path, content);
+
+    private static async Task WriteSkelFileAsync(string path, byte[] content) => await File.WriteAllBytesAsync(path, content);
+
+    #region Cleanup
+
+    private void InitialClean()
     {
-        foreach (var folder in Directory.GetDirectories(location, "*Textures*", SearchOption.AllDirectories))
-            Directory.Delete(folder, true);
-    }
-    public void PostCleanJson()
-    {
-        foreach (var json in Directory.GetFiles(location, "*.json", SearchOption.AllDirectories))
-            File.Delete(json);
-    }
-    
-    public void MoveTexture()
-    {
-        foreach (var texture in Directory.GetFiles(location, "*.png", SearchOption.AllDirectories).Where(x => x.Contains("Textures")))
+        foreach (var jsonTexture in Directory.GetFiles(_location, "*.json", SearchOption.AllDirectories)
+                     .Where(f => f.Contains("Textures")))
         {
-            File.Move(texture, texture.Replace(@"Textures\", String.Empty), true);
+            File.Delete(jsonTexture);
+        }
+    }
+
+    private void PostClean()
+    {
+        // Delete all JSON files
+        foreach (var json in Directory.GetFiles(_location, "*.json", SearchOption.AllDirectories))
+        {
+            File.Delete(json);
+        }
+
+        // Move textures and delete texture folders
+        foreach (var texture in Directory.GetFiles(_location, "*.png", SearchOption.AllDirectories)
+                     .Where(x => x.Contains("Textures")))
+        {
+            var destFileName = texture.Replace(@"Textures", string.Empty);
+            File.Move(texture, destFileName, true);
+        }
+
+        foreach (var folder in Directory.GetDirectories(_location, "*Textures*", SearchOption.AllDirectories))
+        {
+            Directory.Delete(folder, true);
         }
     }
 
